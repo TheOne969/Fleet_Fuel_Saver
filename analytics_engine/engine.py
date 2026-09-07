@@ -1,49 +1,26 @@
 import numpy as np
-from collections import deque, defaultdict
+from collections import defaultdict, deque
 
-# Store sliding windows for each active trip. 
-# Using deque(maxlen=20) automatically drops old points, preventing memory leaks.
-trip_states = defaultdict(lambda: {
-    "rpm": deque(maxlen=20),
-    "speed": deque(maxlen=20)
-})
-
-def process_telemetry(data: dict):
-    """
-    Evaluates a single telemetry point for anomalies.
-    Returns an alert dictionary if anomalous, else None.
-    """
-    trip_id = data["trip_id"]
-    rpm = data["rpm"]
-    speed = data["speed"]
-    
-    state = trip_states[trip_id]
-    state["rpm"].append(rpm)
-    state["speed"].append(speed)
-    
-    # We need at least 10 points to establish a statistical baseline
-    if len(state["rpm"]) < 10:
-        return None
+class AnomalyDetector:
+    def __init__(self, window_size=20, z_threshold=3.0):
+        self.window_size = window_size
+        self.z_threshold = z_threshold
+        # Stores rpm values per trip
+        self.windows = defaultdict(lambda: deque(maxlen=window_size))
         
-    # Calculate Z-score for RPM using NumPy
-    rpm_array = np.array(state["rpm"])
-    mean_rpm = np.mean(rpm_array)
-    std_rpm = np.std(rpm_array)
-    
-    if std_rpm == 0:  # Prevent division by zero if vehicle is idling consistently
-        return None
+    def check_anomaly(self, trip_id, rpm, speed):
+        window = self.windows[trip_id]
+        window.append(rpm)
         
-    z_score = (rpm - mean_rpm) / std_rpm
-    
-    # Anomaly trigger: RPM is > 2.5 standard deviations above recent average, 
-    # AND the vehicle is actually moving.
-    if z_score > 2.5 and speed > 10.0:
-        return {
-            "type": "AGGRESSIVE_DRIVING",
-            "trip_id": trip_id,
-            "message": f"Aggressive acceleration detected! RPM spike to {rpm} (Z-Score: {z_score:.2f})",
-            "timestamp": data["timestamp"],
-            "severity": "high"
-        }
+        if len(window) < self.window_size:
+            return False, 0.0
+            
+        mean = np.mean(window)
+        std = np.std(window)
         
-    return None
+        if std == 0:
+            return False, 0.0
+            
+        z_score = (rpm - mean) / std
+        is_anomaly = abs(z_score) > self.z_threshold
+        return is_anomaly, z_score

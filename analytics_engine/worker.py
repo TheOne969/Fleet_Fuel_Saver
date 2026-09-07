@@ -1,46 +1,60 @@
 import json
-import time
-from core.redis import r, STREAM_NAME, ALERT_CHANNEL
-from engine import process_telemetry
+import logging
+from datetime import datetime
+from core.redis import get_redis_client
+from core.database import get_db_connection, init_db
+from engine import AnomalyDetector
 
-def run_worker():
-    print("Analytics Worker started. Waiting for telemetry data...")
+def main():
+    logging.basicConfig(level=logging.INFO)
+    init_db()
+    r = get_redis_client()
+    db = get_db_connection()
+    db.autocommit = True
+    cursor = db.cursor()
     
-    # Start reading only new messages
-    last_id = '$' 
-    points_analyzed = 0
+    detector = AnomalyDetector()
+    last_id = "0"
     
+    logging.info("Analytics Worker started")
     while True:
         try:
-            # Block for up to 1000ms waiting for new data
-            messages = r.xread({STREAM_NAME: last_id}, count=100, block=1000)
-            
-            if not messages:
+            events = r.xread({"telemetry:stream": last_id}, count=100, block=1000)
+            if not events:
                 continue
                 
-            for stream, msg_list in messages:
-                for message_id, message_data in msg_list:
-                    last_id = message_id
+            for stream_name, messages in events:
+                for msg_id, data in messages:
+                    last_id = msg_id
+                    trip_id = data["trip_id"]
+                    rpm = float(data["rpm"])
+                    speed = float(data["speed"])
                     
-                    raw_payload = message_data.get("payload")
-                    if not raw_payload:
-                        continue
-                        
-                    telemetry_data = json.loads(raw_payload)
-                    alert = process_telemetry(telemetry_data)
+                    is_anomaly, z_score = detector.check_anomaly(trip_id, rpm, speed)
                     
-                    # --- NEW: Visual feedback ---
-                    points_analyzed += 1
-                    if points_analyzed % 50 == 0:
-                        print(f"⚙️ Worker analyzed {points_analyzed} points in-memory...")
-                    
-                    if alert:
-                        print(f"🚨 ALERT DETECTED: {alert['message']}")
-                        r.publish(ALERT_CHANNEL, json.dumps(alert))
-                        
+                    if is_anomaly:
+                        alert = {
+                            "trip_id": trip_id,
+                            "type": "AGGRESSIVE_DRIVING",
+                            "rpm": rpm,
+                            "speed": speed,
+                            "z_score": float(z_score),
+                            "timestamp": data["timestamp"]
+                        }
+                        r.publish("alerts:live", json.dumps(alert))
+                        logging.warning(f"Anomaly detected for {trip_id}: {alert}")
+
+                    # Async batching skipped for Ponytail laziness - single inserts work until they don't
+                    cursor.execute("""
+                        INSERT INTO telemetry_data (time, trip_id, speed, rpm, ambient_temp, gradient, gps_lat, gps_lng)
+                        VALUES (to_timestamp(%s / 1000.0), %s, %s, %s, %s, %s, %s, %s)
+                    """, (
+                        int(data["timestamp"]), trip_id, speed, rpm, 
+                        float(data["ambient_temp"]), float(data["gradient"]), 
+                        float(data["gps_lat"]), float(data["gps_lng"])
+                    ))
         except Exception as e:
-            print(f"Worker Error: {e}")
-            time.sleep(1)
+            logging.error(f"Worker error: {e}")
 
 if __name__ == "__main__":
-    run_worker()
+    main()

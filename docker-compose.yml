@@ -1,0 +1,94 @@
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - fleet-net
+
+  postgres:
+    image: timescale/timescaledb:latest-pg15
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: fleet_user
+      POSTGRES_PASSWORD: fleet_password
+      POSTGRES_DB: fleet_db
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    networks:
+      - fleet-net
+
+  ingestion:
+    build: ./ingestion_service
+    ports:
+      - "50051:50051"
+    environment:
+      - REDIS_HOST=redis
+    depends_on:
+      - redis
+    networks:
+      - fleet-net
+    restart: always
+
+  analytics:
+    build: ./analytics_engine
+    environment:
+      - REDIS_HOST=redis
+      - PG_HOST=postgres
+      - PG_USER=fleet_user
+      - PG_PASSWORD=fleet_password
+      - PG_DB=fleet_db
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - fleet-net
+    restart: always
+
+  api:
+    build: ./api_service
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_HOST=redis
+      - PG_HOST=postgres
+      - PG_USER=fleet_user
+      - PG_PASSWORD=fleet_password
+      - PG_DB=fleet_db
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - fleet-net
+    restart: always
+
+  simulator:
+    build: ./simulator
+    environment:
+      - INGESTION_HOST=ingestion:50051
+    depends_on:
+      - ingestion
+    networks:
+      - fleet-net
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:5173"
+    depends_on:
+      - api
+    networks:
+      - fleet-net
+
+volumes:
+  redis_data:
+  pg_data:
+
+networks:
+  fleet-net:
+    driver: bridge
+

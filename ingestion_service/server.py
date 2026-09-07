@@ -37,7 +37,7 @@ class TelemetryService(telemetry_pb2_grpc.TelemetryServiceServicer): # Defines t
         ) 
 
 def serve(): # Defines the main server startup function, which will act as the middleman between redis streams and vehicle
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10)) # Creates a gRPC server with a thread pool of 10 workers
+    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10)) # Creates a gRPC server with a thread pool of 10 workers, which can handle 10 vehicles simulatenously
     telemetry_pb2_grpc.add_TelemetryServiceServicer_to_server(TelemetryService(), server) # Registers our TelemetryService with the gRPC server
     server.add_insecure_port('[::]:50051') # Binds the server to all interfaces on port 50051 without TLS encryption.
     server.start() # Starts listening for incoming gRPC connections

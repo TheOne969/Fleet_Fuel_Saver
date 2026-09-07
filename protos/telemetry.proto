@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package telemetry;
+
+// The continuous telemetry payload sent by the IoT hardware simulator
+message TelemetryPoint {
+  string trip_id = 1;        // Unique identifier for the active trip/vehicle
+  int64 timestamp = 2;       // Unix epoch timestamp in milliseconds
+  float speed = 3;           // Speed in km/h or mph
+  int32 rpm = 4;             // Engine RPM
+  float ambient_temp = 5;    // Outside temperature in Celsius
+  float gradient = 6;        // Road gradient/incline percentage
+  float gps_lat = 7;         // GPS Latitude
+  float gps_lng = 8;         // GPS Longitude
+}
+
+// Acknowledgement from the ingestion server after a stream ends or reconnects
+message TelemetryResponse {
+  bool success = 1;
+  int32 points_received = 2; // Total valid points ingested during the stream session
+  string message = 3;
+}
+
+// The gRPC Service definition
+service TelemetryService {
+  // Client streams continuous telemetry data. 
+  // Server responds once when the client closes the stream.
+  rpc StreamTelemetry (stream TelemetryPoint) returns (TelemetryResponse);
+}

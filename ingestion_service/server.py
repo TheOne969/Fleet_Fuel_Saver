@@ -27,7 +27,7 @@ class TelemetryService(telemetry_pb2_grpc.TelemetryServiceServicer): # Defines t
                     "gps_lng": point.gps_lng, # Extracts GPS longitude
                 } # Closes the dictionary
                 # XADD to Redis Stream
-                self.redis.xadd(self.stream_name, data) # Appends the data dictionary to the Redis Stream
+                self.redis.xadd(self.stream_name, data, maxlen=100000) # Appends with maxlen cap
                 points_received += 1 # Increments the received points counter
         except Exception as e: # Catches any exceptions during streaming
             logging.error(f"Error processing stream: {e}") # Logs the error message

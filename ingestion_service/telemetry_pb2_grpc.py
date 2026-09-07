@@ -5,67 +5,67 @@ import grpc
 import telemetry_pb2 as telemetry__pb2
 
 
-class TelemetryServiceStub(object):
+class TelemetryServiceStub(object): # Defines the client-side stub for TelemetryService
     """The gRPC Service definition
     """
 
-    def __init__(self, channel):
+    def __init__(self, channel): # Initializes the stub with a channel
         """Constructor.
 
         Args:
             channel: A grpc.Channel.
         """
-        self.StreamTelemetry = channel.stream_unary(
-                '/telemetry.TelemetryService/StreamTelemetry',
-                request_serializer=telemetry__pb2.TelemetryPoint.SerializeToString,
-                response_deserializer=telemetry__pb2.TelemetryResponse.FromString,
-                )
+        self.StreamTelemetry = channel.stream_unary( # Creates a callable for the client-streaming RPC
+                '/telemetry.TelemetryService/StreamTelemetry', # The fully qualified method name
+                request_serializer=telemetry__pb2.TelemetryPoint.SerializeToString, # Serializer for outgoing messages
+                response_deserializer=telemetry__pb2.TelemetryResponse.FromString, # Deserializer for incoming responses
+                ) # Closes the method definition
 
 
-class TelemetryServiceServicer(object):
+class TelemetryServiceServicer(object): # Defines the server-side base class for TelemetryService
     """The gRPC Service definition
     """
 
-    def StreamTelemetry(self, request_iterator, context):
+    def StreamTelemetry(self, request_iterator, context): # Method stub for handling the stream
         """Client streams continuous telemetry data. 
         Server responds once when the client closes the stream.
         """
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED) # Sets default unimplemented status code
+        context.set_details('Method not implemented!') # Sets default error message
+        raise NotImplementedError('Method not implemented!') # Raises exception if subclass doesn't implement it
 
 
-def add_TelemetryServiceServicer_to_server(servicer, server):
-    rpc_method_handlers = {
-            'StreamTelemetry': grpc.stream_unary_rpc_method_handler(
-                    servicer.StreamTelemetry,
-                    request_deserializer=telemetry__pb2.TelemetryPoint.FromString,
-                    response_serializer=telemetry__pb2.TelemetryResponse.SerializeToString,
-            ),
-    }
-    generic_handler = grpc.method_handlers_generic_handler(
-            'telemetry.TelemetryService', rpc_method_handlers)
-    server.add_generic_rpc_handlers((generic_handler,))
+def add_TelemetryServiceServicer_to_server(servicer, server): # Helper to register the servicer with a server
+    rpc_method_handlers = { # Maps method names to their handler definitions
+            'StreamTelemetry': grpc.stream_unary_rpc_method_handler( # Defines the handler type as stream-unary
+                    servicer.StreamTelemetry, # Binds the servicer's implementation method
+                    request_deserializer=telemetry__pb2.TelemetryPoint.FromString, # Deserializer for incoming stream
+                    response_serializer=telemetry__pb2.TelemetryResponse.SerializeToString, # Serializer for outgoing response
+            ), # Closes the method mapping
+    } # Closes the handlers dictionary
+    generic_handler = grpc.method_handlers_generic_handler( # Creates a generic handler for the service
+            'telemetry.TelemetryService', rpc_method_handlers) # Binds the service name and method handlers
+    server.add_generic_rpc_handlers((generic_handler,)) # Adds the handler to the active server
 
 
  # This class is part of an EXPERIMENTAL API.
-class TelemetryService(object):
+class TelemetryService(object): # Experimental API wrapper class
     """The gRPC Service definition
     """
 
-    @staticmethod
-    def StreamTelemetry(request_iterator,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.stream_unary(request_iterator, target, '/telemetry.TelemetryService/StreamTelemetry',
-            telemetry__pb2.TelemetryPoint.SerializeToString,
-            telemetry__pb2.TelemetryResponse.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+    @staticmethod # Defines this as a static method
+    def StreamTelemetry(request_iterator, # Accepts the iterator
+            target, # Accepts the target URI
+            options=(), # Accepts optional channel arguments
+            channel_credentials=None, # Accepts optional TLS credentials
+            call_credentials=None, # Accepts optional call credentials
+            insecure=False, # Accepts insecure flag
+            compression=None, # Accepts compression settings
+            wait_for_ready=None, # Accepts wait_for_ready setting
+            timeout=None, # Accepts timeout value
+            metadata=None): # Accepts custom metadata
+        return grpc.experimental.stream_unary(request_iterator, target, '/telemetry.TelemetryService/StreamTelemetry', # Delegates to experimental API
+            telemetry__pb2.TelemetryPoint.SerializeToString, # Serializer
+            telemetry__pb2.TelemetryResponse.FromString, # Deserializer
+            options, channel_credentials, # Passes options and credentials
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata) # Passes all remaining config args

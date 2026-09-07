@@ -8,22 +8,19 @@ from google.protobuf import symbol_database as _symbol_database
 from google.protobuf.internal import builder as _builder
 # @@protoc_insertion_point(imports)
 
-_sym_db = _symbol_database.Default()
+_sym_db = _symbol_database.Default() # Gets the default symbol database for protobuf
 
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0ftelemetry.proto\x12\ttelemetry\"\x9a\x01\n\x0eTelemetryPoint\x12\x0f\n\x07trip_id\x18\x01 \x01(\t\x12\x11\n\ttimestamp\x18\x02 \x01(\x03\x12\r\n\x05speed\x18\x03 \x01(\x02\x12\x0b\n\x03rpm\x18\x04 \x01(\x05\x12\x14\n\x0c\x61mbient_temp\x18\x05 \x01(\x02\x12\x10\n\x08gradient\x18\x06 \x01(\x02\x12\x0f\n\x07gps_lat\x18\x07 \x01(\x02\x12\x0f\n\x07gps_lng\x18\x08 \x01(\x02\"N\n\x11TelemetryResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\x17\n\x0fpoints_received\x18\x02 \x01(\x05\x12\x0f\n\x07message\x18\x03 \x01(\t2`\n\x10TelemetryService\x12L\n\x0fStreamTelemetry\x12\x19.telemetry.TelemetryPoint\x1a\x1c.telemetry.TelemetryResponse(\x01\x62\x06proto3') # Loads the serialized protobuf definition into the default descriptor pool
 
-
-
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0ftelemetry.proto\x12\ttelemetry\"\x9a\x01\n\x0eTelemetryPoint\x12\x0f\n\x07trip_id\x18\x01 \x01(\t\x12\x11\n\ttimestamp\x18\x02 \x01(\x03\x12\r\n\x05speed\x18\x03 \x01(\x02\x12\x0b\n\x03rpm\x18\x04 \x01(\x05\x12\x14\n\x0c\x61mbient_temp\x18\x05 \x01(\x02\x12\x10\n\x08gradient\x18\x06 \x01(\x02\x12\x0f\n\x07gps_lat\x18\x07 \x01(\x02\x12\x0f\n\x07gps_lng\x18\x08 \x01(\x02\"N\n\x11TelemetryResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\x17\n\x0fpoints_received\x18\x02 \x01(\x05\x12\x0f\n\x07message\x18\x03 \x01(\t2`\n\x10TelemetryService\x12L\n\x0fStreamTelemetry\x12\x19.telemetry.TelemetryPoint\x1a\x1c.telemetry.TelemetryResponse(\x01\x62\x06proto3')
-
-_globals = globals()
-_builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
-_builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'telemetry_pb2', _globals)
-if _descriptor._USE_C_DESCRIPTORS == False:
-  DESCRIPTOR._options = None
-  _globals['_TELEMETRYPOINT']._serialized_start=31
-  _globals['_TELEMETRYPOINT']._serialized_end=185
-  _globals['_TELEMETRYRESPONSE']._serialized_start=187
-  _globals['_TELEMETRYRESPONSE']._serialized_end=265
-  _globals['_TELEMETRYSERVICE']._serialized_start=267
-  _globals['_TELEMETRYSERVICE']._serialized_end=363
+_globals = globals() # Gets the global symbol table
+_builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals) # Dynamically creates Python classes for protobuf messages/enums
+_builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'telemetry_pb2', _globals) # Attaches generated descriptors to the current module
+if _descriptor._USE_C_DESCRIPTORS == False: # Checks if the C++ protobuf extension is NOT being used
+  DESCRIPTOR._options = None # Clears options for pure-python implementation
+  _globals['_TELEMETRYPOINT']._serialized_start=31 # Sets byte offset for TelemetryPoint start
+  _globals['_TELEMETRYPOINT']._serialized_end=185 # Sets byte offset for TelemetryPoint end
+  _globals['_TELEMETRYRESPONSE']._serialized_start=187 # Sets byte offset for TelemetryResponse start
+  _globals['_TELEMETRYRESPONSE']._serialized_end=265 # Sets byte offset for TelemetryResponse end
+  _globals['_TELEMETRYSERVICE']._serialized_start=267 # Sets byte offset for TelemetryService start
+  _globals['_TELEMETRYSERVICE']._serialized_end=363 # Sets byte offset for TelemetryService end
 # @@protoc_insertion_point(module_scope)

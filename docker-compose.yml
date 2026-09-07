@@ -23,7 +23,9 @@ services:
       - fleet-net
 
   ingestion:
-    build: ./ingestion_service
+    build:
+      context: .
+      dockerfile: ingestion_service/Dockerfile
     ports:
       - "50051:50051"
     environment:
@@ -67,7 +69,9 @@ services:
     restart: always
 
   simulator:
-    build: ./simulator
+    build:
+      context: .
+      dockerfile: simulator/Dockerfile
     environment:
       - INGESTION_HOST=ingestion:50051
     depends_on:

@@ -5,8 +5,7 @@ import uuid
 import sys
 import traceback
 
-import telemetry_pb2
-import telemetry_pb2_grpc
+from shared_proto import telemetry_pb2, telemetry_pb2_grpc
 import config
 
 # Global flag to control the generator loop

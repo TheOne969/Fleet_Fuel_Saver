@@ -26,6 +26,7 @@ def init_db():  # Initializes the database schema and required extensions
         );
         CREATE EXTENSION IF NOT EXISTS timescaledb;  -- Enables the TimescaleDB extension for time-series optimization in Postgres
         SELECT create_hypertable('telemetry_data', 'time', if_not_exists => TRUE);  -- Converts the standard Postgres table into a TimescaleDB hypertable partitioned by 'time'
+        SELECT add_retention_policy('telemetry_data', INTERVAL '7 days', if_not_exists => TRUE); -- Automatically deletes data older than 7 days
     """)  
     conn.commit()  
     cur.close()  

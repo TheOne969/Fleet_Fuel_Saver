@@ -14,7 +14,7 @@ def main():
     cursor = db.cursor()
     
     engine = RuleEngine() 
-    last_id = "0"  # Sets the initial Redis Stream read position to "0" (read from the absolute beginning)
+    last_id = "$"  # '$' tells Redis to only read NEW messages that arrive after we connect, skipping the historical backlog
     
     logging.info("Analytics Worker started")  
     while True:  # Starts the infinite background processing loop

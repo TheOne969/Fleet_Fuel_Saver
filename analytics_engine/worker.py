@@ -3,7 +3,7 @@ import logging
 from datetime import datetime
 from shared_redis import get_redis_client
 from core.database import get_db_connection, init_db
-from engine import AnomalyDetector
+from engine import RuleEngine
 
 def main(): 
     logging.basicConfig(level=logging.INFO)  
@@ -13,7 +13,7 @@ def main():
     db.autocommit = True  # Tells Postgres to automatically commit every executed statement (no manual commit() needed)
     cursor = db.cursor()
     
-    detector = AnomalyDetector() 
+    engine = RuleEngine() 
     last_id = "0"  # Sets the initial Redis Stream read position to "0" (read from the absolute beginning)
     
     logging.info("Analytics Worker started")  
@@ -30,19 +30,16 @@ def main():
                     rpm = float(data["rpm"])  
                     speed = float(data["speed"])  
                     
-                    is_anomaly, z_score = detector.check_anomaly(trip_id, rpm, speed)  # Passes the data to the math engine to check for aggressive driving spikes
+                    alerts = engine.evaluate(trip_id, rpm, speed)  # Passes the data to the rule engine
                     
-                    if is_anomaly:  
+                    for alert_data in alerts:
                         alert = { 
                             "trip_id": trip_id,  
-                            "type": "AGGRESSIVE_DRIVING", 
-                            "rpm": rpm, 
-                            "speed": speed, 
-                            "z_score": float(z_score), 
-                            "timestamp": data["timestamp"]  
+                            "timestamp": data["timestamp"],
+                            **alert_data
                         }  
                         r.publish("alerts:live", json.dumps(alert))  # Broadcasts the serialized JSON alert to a Redis Pub/Sub channel for frontend consumption
-                        logging.warning(f"Anomaly detected for {trip_id}: {alert}") 
+                        logging.warning(f"Alert generated for {trip_id}: {alert}")
 
                     cursor.execute("""  # Executes a SQL query to insert the raw telemetry point into Postgres for long-term storage
                         INSERT INTO telemetry_data (time, trip_id, speed, rpm, ambient_temp, gradient, gps_lat, gps_lng)

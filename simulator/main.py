@@ -31,7 +31,7 @@ def generate_telemetry(trip_id):
                     break
                     
                 # Map Kaggle columns to Protobuf schema
-                yield telemetry_pb2.TelemetryPoint( 
+                point = telemetry_pb2.TelemetryPoint( 
                     trip_id=str(trip_id), 
                     timestamp=int(time.time() * 1000),
                     speed=float(row['Vehicle Speed[km/h]']), 
@@ -41,6 +41,8 @@ def generate_telemetry(trip_id):
                     gps_lat=float(row['Latitude[deg]']), 
                     gps_lng=float(row['Longitude[deg]'])
                 )  
+                print(f"[CSV] Speed: {point.speed:5.1f} | RPM: {point.rpm:4.0f}")
+                yield point
                 time.sleep(config.TICK_RATE_MS / 1000.0)
                 
     except Exception as e:
@@ -81,7 +83,7 @@ def random_generation(trip_id):
             lat += random.uniform(-0.0001, 0.0001)
             lng += random.uniform(-0.0001, 0.0001)
 
-            yield telemetry_pb2.TelemetryPoint( 
+            point = telemetry_pb2.TelemetryPoint( 
                 trip_id=str(trip_id), 
                 timestamp=int(time.time() * 1000),  
                 speed=float(speed), 
@@ -90,7 +92,9 @@ def random_generation(trip_id):
                 gradient=float(gradient), 
                 gps_lat=float(lat), 
                 gps_lng=float(lng)
-            )  
+            )
+            print(f"[LIVE] Target: {target_speed:3.0f} | Speed: {speed:5.1f} | RPM: {rpm:4.0f} | Anomaly Roll: {anomaly:.3f}")
+            yield point
             time.sleep(config.TICK_RATE_MS / 1000.0)
 
     except Exception as e:  

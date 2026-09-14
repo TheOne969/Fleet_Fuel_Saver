@@ -1,7 +1,7 @@
 import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from api.routers import alerts, history, fleet
+from api.routers import alerts
 
 app = FastAPI(title="Fleet API")
 
@@ -14,8 +14,6 @@ app.add_middleware(
 )
 
 app.include_router(alerts.router)
-app.include_router(history.router)
-app.include_router(fleet.router)
 
 @app.get("/health")
 def health():

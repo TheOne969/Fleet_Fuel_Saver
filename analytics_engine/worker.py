@@ -1,7 +1,7 @@
 import json
 import logging
 from datetime import datetime
-from core.redis import get_redis_client
+from shared_redis import get_redis_client
 from core.database import get_db_connection, init_db
 from engine import AnomalyDetector
 

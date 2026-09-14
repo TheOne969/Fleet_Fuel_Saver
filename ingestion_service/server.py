@@ -2,8 +2,9 @@ import grpc
 from concurrent import futures
 import logging
 
-from shared_proto import telemetry_pb2, telemetry_pb2_grpc
-from core.redis_client import get_redis_client
+from shared_proto import telemetry_pb2
+from shared_proto import telemetry_pb2_grpc
+from shared_redis import get_redis_client
 
 class TelemetryService(telemetry_pb2_grpc.TelemetryServiceServicer): # Defines the gRPC service class inheriting from the generated proto stub
     def __init__(self): # Initializes the service instance

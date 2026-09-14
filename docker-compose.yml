@@ -37,7 +37,9 @@ services:
     restart: always
 
   analytics:
-    build: ./analytics_engine
+    build:
+      context: .
+      dockerfile: analytics_engine/Dockerfile
     environment:
       - REDIS_HOST=redis
       - PG_HOST=postgres

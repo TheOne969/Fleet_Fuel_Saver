@@ -9,7 +9,7 @@ from shared_proto import telemetry_pb2, telemetry_pb2_grpc  # Import generated P
 from . import config  # Import configuration settings (like TICK_RATE_MS and INGESTION_HOST)
 
 
-is_running = True  # Boolean flag used to control whether the continuous telemetry streaming loop continues running
+is_running = True  #flag used to control whether the continuous telemetry streaming loop continues running
 
 def generate_telemetry(trip_id):  # Generator function that continuously yields simulated TelemetryPoint objects
     global is_running  # References the global is_running flag so it can read and update it

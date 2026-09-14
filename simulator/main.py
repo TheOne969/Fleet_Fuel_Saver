@@ -54,15 +54,29 @@ def random_generation(trip_id):
     lat, lng = 17.3850, 78.4867  
 
     try:  
+        target_speed = 40.0
         while is_running:  
-            speed = max(0.0, min(140.0, speed + random.uniform(-2.0, 2.5)))
-            rpm = max(800.0, min(6500.0, rpm + random.uniform(-100.0, 150.0) + (speed * 2.0)))
+            if random.random() < 0.05: # 5% chance per second to change target speed
+                target_speed = random.choice([0.0, 40.0, 90.0, 130.0]) # Stop, City, Highway, Overspeeding
+                
+            # Smoothly accelerate/decelerate towards target speed
+            speed += (target_speed - speed) * 0.1 + random.uniform(-1.0, 1.0)
+            speed = max(0.0, speed)
+            
+            # Base RPM scales with speed
+            rpm = max(800.0, 1000.0 + (speed * 20.0) + random.uniform(-200.0, 200.0))
+
+            anomaly = random.random()
+            if anomaly < 0.02:
+                # 2% chance: Force Idle Revving (Speed < 10, RPM > 3000)
+                speed = random.uniform(0.0, 5.0)
+                rpm = random.uniform(3500.0, 5000.0)
+            elif anomaly < 0.04:
+                # 2% chance: Force Sudden Acceleration / RPM Spike (Z-Score > 3.0)
+                rpm += random.uniform(3000.0, 4000.0)
+
             gradient = random.uniform(-5.0, 5.0)
             temp = 25.0 + random.uniform(-0.5, 0.5)
-
-            if random.random() < 0.01:
-                rpm += random.uniform(2000.0, 3500.0)
-                speed += random.uniform(5.0, 15.0)
 
             lat += random.uniform(-0.0001, 0.0001)
             lng += random.uniform(-0.0001, 0.0001)

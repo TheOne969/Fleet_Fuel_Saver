@@ -41,6 +41,14 @@ def main():
                         r.publish("alerts:live", json.dumps(alert))  # Broadcasts the serialized JSON alert to a Redis Pub/Sub channel for frontend consumption
                         logging.warning(f"Alert generated for {trip_id}: {alert}")
 
+                        cursor.execute("""
+                            INSERT INTO alerts (time, trip_id, type, severity, reason)
+                            VALUES (to_timestamp(%s / 1000.0), %s, %s, %s, %s)
+                        """, (
+                            int(data["timestamp"]), trip_id, alert_data["type"], 
+                            alert_data["severity"], alert_data["reason"]
+                        ))
+
                     cursor.execute("""
                         INSERT INTO telemetry_data (time, trip_id, speed, rpm, ambient_temp, gradient, gps_lat, gps_lng)
                         VALUES (to_timestamp(%s / 1000.0), %s, %s, %s, %s, %s, %s, %s)

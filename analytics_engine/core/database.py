@@ -24,9 +24,18 @@ def init_db():  # Initializes the database schema and required extensions
             gps_lat DOUBLE PRECISION,  -- GPS latitude coordinate
             gps_lng DOUBLE PRECISION  -- GPS longitude coordinate
         );
+        CREATE TABLE IF NOT EXISTS alerts (
+            time TIMESTAMPTZ NOT NULL,
+            trip_id TEXT NOT NULL,
+            type TEXT NOT NULL,
+            severity TEXT NOT NULL,
+            reason TEXT NOT NULL
+        );
         CREATE EXTENSION IF NOT EXISTS timescaledb;  -- Enables the TimescaleDB extension for time-series optimization in Postgres
         SELECT create_hypertable('telemetry_data', 'time', if_not_exists => TRUE);  -- Converts the standard Postgres table into a TimescaleDB hypertable partitioned by 'time'
+        SELECT create_hypertable('alerts', 'time', if_not_exists => TRUE);
         SELECT add_retention_policy('telemetry_data', INTERVAL '7 days', if_not_exists => TRUE); -- Automatically deletes data older than 7 days
+        SELECT add_retention_policy('alerts', INTERVAL '7 days', if_not_exists => TRUE);
     """)  
     conn.commit()  
     cur.close()  

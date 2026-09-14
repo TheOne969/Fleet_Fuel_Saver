@@ -13,7 +13,7 @@ def get_db_connection():  # Creates and returns a connection to the PostgreSQL d
 def init_db():  # Initializes the database schema and required extensions
     conn = get_db_connection()  
     cur = conn.cursor() 
-    cur.execute("""  # Executes a multi-line SQL string
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS telemetry_data (  -- Creates the table only if it doesn't already exist
             time TIMESTAMPTZ NOT NULL,  -- Timestamp with time zone (required by TimescaleDB for time-series)
             trip_id TEXT NOT NULL,  -- Unique identifier for the vehicle's trip
@@ -29,5 +29,4 @@ def init_db():  # Initializes the database schema and required extensions
     """)  
     conn.commit()  
     cur.close()  
-    conn.close()  
-
+    conn.close()

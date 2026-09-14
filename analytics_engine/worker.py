@@ -41,7 +41,7 @@ def main():
                         r.publish("alerts:live", json.dumps(alert))  # Broadcasts the serialized JSON alert to a Redis Pub/Sub channel for frontend consumption
                         logging.warning(f"Alert generated for {trip_id}: {alert}")
 
-                    cursor.execute("""  # Executes a SQL query to insert the raw telemetry point into Postgres for long-term storage
+                    cursor.execute("""
                         INSERT INTO telemetry_data (time, trip_id, speed, rpm, ambient_temp, gradient, gps_lat, gps_lng)
                         VALUES (to_timestamp(%s / 1000.0), %s, %s, %s, %s, %s, %s, %s)
                     """, (

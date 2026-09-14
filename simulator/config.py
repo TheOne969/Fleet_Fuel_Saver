@@ -4,4 +4,4 @@ import os
 INGESTION_HOST = os.getenv("INGESTION_HOST", "localhost:50051")
 
 # Telemetry frequency
-TICK_RATE_MS = int(os.getenv("TICK_RATE_MS", 100))
+TICK_RATE_MS = int(os.getenv("TICK_RATE_MS", 1000))

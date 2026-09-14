@@ -3,10 +3,9 @@ import { create } from 'zustand';
 interface Alert {
   trip_id: string;
   type: string;
-  rpm: number;
-  speed: number;
-  z_score: number;
-  timestamp: number;
+  severity: string;
+  reason: string;
+  timestamp: string | number;
 }
 
 interface FleetStore {
@@ -20,4 +19,3 @@ export const useFleetStore = create<FleetStore>((set) => ({
       alerts: [alert, ...state.alerts].slice(0, 100) 
   })),
 }));
-

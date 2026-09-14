@@ -6,6 +6,6 @@ build-backend = "setuptools.build_meta"
 name = "shared_proto"
 version = "0.1.0"
 dependencies = [
-    "grpcio>=1.59.0",
-    "protobuf>=4.25.0"
+    "grpcio",
+    "protobuf"
 ]

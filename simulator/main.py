@@ -12,16 +12,17 @@ import config
 
 is_running = True
 
-def generate_telemetry(trip_id):
+def generate_telemetry():
     global is_running
     csv_path = "/data/vehicle_data.csv"
     
     if not os.path.exists(csv_path):
         print(f"❌ ERROR: Dataset not found at {csv_path}!")
-        print("Falling back to random generation...")
-        yield from random_generation(trip_id)
+        print("Falling back to multi-vehicle random generation...")
+        yield from random_generation()
         return
 
+    fallback_trip_id = f"trip-csv-{uuid.uuid4().hex[:8]}"
     print(f"✅ Found Kaggle Dataset! Replaying {csv_path}...")
     try:
         with open(csv_path, 'r') as f:
@@ -30,9 +31,12 @@ def generate_telemetry(trip_id):
                 if not is_running:
                     break
                     
+                # Use the dataset's Trip ID if it exists, otherwise fallback to the generated one
+                current_trip = row.get('Trip', row.get('Trip_ID', row.get('Vehicle_ID', fallback_trip_id)))
+                
                 # Map Kaggle columns to Protobuf schema
                 point = telemetry_pb2.TelemetryPoint( 
-                    trip_id=str(trip_id), 
+                    trip_id=str(current_trip), 
                     timestamp=int(time.time() * 1000),
                     speed=float(row['Vehicle Speed[km/h]']), 
                     rpm=int(float(row['Engine RPM[RPM]'])),
@@ -41,7 +45,7 @@ def generate_telemetry(trip_id):
                     gps_lat=float(row['Latitude[deg]']), 
                     gps_lng=float(row['Longitude[deg]'])
                 )  
-                print(f"[CSV] Speed: {point.speed:5.1f} | RPM: {point.rpm:4.0f}")
+                print(f"[CSV] {current_trip} | Speed: {point.speed:5.1f} | RPM: {point.rpm:4.0f}")
                 yield point
                 time.sleep(config.TICK_RATE_MS / 1000.0)
                 
@@ -49,52 +53,56 @@ def generate_telemetry(trip_id):
         print(f"\n❌ PYTHON CSV GENERATOR CRASHED: {e}")
         traceback.print_exc()
 
-def random_generation(trip_id):
+def random_generation():
     global is_running
-    speed = 0.0  
-    rpm = 800.0  
-    lat, lng = 17.3850, 78.4867  
+    NUM_VEHICLES = 3  # Simulate 3 concurrent trips
+    
+    trips = []
+    for _ in range(NUM_VEHICLES):
+        trips.append({
+            "id": f"trip-{uuid.uuid4().hex[:8]}",
+            "speed": 0.0,
+            "rpm": 800.0,
+            "lat": 17.3850 + random.uniform(-0.1, 0.1),
+            "lng": 78.4867 + random.uniform(-0.1, 0.1),
+            "target": 40.0
+        })
 
     try:  
-        target_speed = 40.0
         while is_running:  
-            if random.random() < 0.05: # 5% chance per second to change target speed
-                target_speed = random.choice([0.0, 40.0, 90.0, 130.0]) # Stop, City, Highway, Overspeeding
+            for t in trips:
+                if random.random() < 0.05: # 5% chance to change target speed
+                    t["target"] = random.choice([0.0, 40.0, 90.0, 130.0])
+                    
+                # Smoothly accelerate/decelerate towards target speed
+                t["speed"] = max(0.0, t["speed"] + (t["target"] - t["speed"]) * 0.1 + random.uniform(-1.0, 1.0))
                 
-            # Smoothly accelerate/decelerate towards target speed
-            speed += (target_speed - speed) * 0.1 + random.uniform(-1.0, 1.0)
-            speed = max(0.0, speed)
-            
-            # Base RPM scales with speed
-            rpm = max(800.0, 1000.0 + (speed * 20.0) + random.uniform(-200.0, 200.0))
+                # Base RPM scales with speed
+                t["rpm"] = max(800.0, 1000.0 + (t["speed"] * 20.0) + random.uniform(-200.0, 200.0))
 
-            anomaly = random.random()
-            if anomaly < 0.02:
-                # 2% chance: Force Idle Revving (Speed < 10, RPM > 3000)
-                speed = random.uniform(0.0, 5.0)
-                rpm = random.uniform(3500.0, 5000.0)
-            elif anomaly < 0.04:
-                # 2% chance: Force Sudden Acceleration / RPM Spike (Z-Score > 3.0)
-                rpm += random.uniform(3000.0, 4000.0)
+                anomaly = random.random()
+                if anomaly < 0.02:
+                    t["speed"] = random.uniform(0.0, 5.0)
+                    t["rpm"] = random.uniform(3500.0, 5000.0)
+                elif anomaly < 0.04:
+                    t["rpm"] += random.uniform(3000.0, 4000.0)
 
-            gradient = random.uniform(-5.0, 5.0)
-            temp = 25.0 + random.uniform(-0.5, 0.5)
+                t["lat"] += random.uniform(-0.0001, 0.0001)
+                t["lng"] += random.uniform(-0.0001, 0.0001)
 
-            lat += random.uniform(-0.0001, 0.0001)
-            lng += random.uniform(-0.0001, 0.0001)
-
-            point = telemetry_pb2.TelemetryPoint( 
-                trip_id=str(trip_id), 
-                timestamp=int(time.time() * 1000),  
-                speed=float(speed), 
-                rpm=int(rpm),
-                ambient_temp=float(temp),
-                gradient=float(gradient), 
-                gps_lat=float(lat), 
-                gps_lng=float(lng)
-            )
-            print(f"[LIVE] Target: {target_speed:3.0f} | Speed: {speed:5.1f} | RPM: {rpm:4.0f} | Anomaly Roll: {anomaly:.3f}")
-            yield point
+                point = telemetry_pb2.TelemetryPoint( 
+                    trip_id=t["id"], 
+                    timestamp=int(time.time() * 1000),  
+                    speed=float(t["speed"]), 
+                    rpm=int(t["rpm"]),
+                    ambient_temp=25.0,
+                    gradient=0.0, 
+                    gps_lat=float(t["lat"]), 
+                    gps_lng=float(t["lng"])
+                )
+                print(f"[LIVE] {t['id']} | Target: {t['target']:3.0f} | Speed: {t['speed']:5.1f} | RPM: {t['rpm']:4.0f}")
+                yield point
+                
             time.sleep(config.TICK_RATE_MS / 1000.0)
 
     except Exception as e:  
@@ -104,14 +112,13 @@ def random_generation(trip_id):
 def run():
     global is_running 
     print(f"Connecting to Ingestion Service at {config.INGESTION_HOST}...") 
-    trip_id = f"trip-{uuid.uuid4().hex[:8]}"
 
     with grpc.insecure_channel(config.INGESTION_HOST) as channel:
         stub = telemetry_pb2_grpc.TelemetryServiceStub(channel)
-        print(f"Starting trip {trip_id}. Press Ctrl+C to stop.") 
+        print("Starting multi-vehicle simulation. Press Ctrl+C to stop.") 
 
         try:  
-            response = stub.StreamTelemetry(generate_telemetry(trip_id))
+            response = stub.StreamTelemetry(generate_telemetry())
             print(f"Stream ended cleanly. Server says: {response.message} (Points: {response.points_received})")
         except KeyboardInterrupt:
             print("\nCaught interrupt signal! Shutting down...") 

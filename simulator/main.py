@@ -79,7 +79,7 @@ def random_generation():
         while is_running:  
             for t in trips:
                 if random.random() < 0.05: # 5% chance to change target speed
-                    t["target"] = random.choice([0.0, 40.0, 90.0, 130.0])
+                    t["target"] = random.choice([0.0, 30.0, 50.0, 70.0])
                     
                 # Smoothly accelerate/decelerate towards target speed
                 t["speed"] = max(0.0, t["speed"] + (t["target"] - t["speed"]) * 0.1 + random.uniform(-1.0, 1.0))
@@ -89,10 +89,10 @@ def random_generation():
 
                 anomaly = random.random()
                 if anomaly < 0.02:
-                    t["speed"] = random.uniform(0.0, 5.0)
-                    t["rpm"] = random.uniform(3500.0, 5000.0)
+                    t["speed"] = random.uniform(0.0, 15.0)
+                    t["rpm"] = random.uniform(2500.0, 3500.0)
                 elif anomaly < 0.04:
-                    t["rpm"] += random.uniform(3000.0, 4000.0)
+                    t["rpm"] += random.uniform(1500.0, 2500.0)
 
                 t["lat"] += random.uniform(-0.0001, 0.0001)
                 t["lng"] += random.uniform(-0.0001, 0.0001)

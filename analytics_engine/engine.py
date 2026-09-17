@@ -2,7 +2,7 @@ import numpy as np
 from collections import deque  # Imports double-ended queue data structure
 
 class RuleEngine:
-    def __init__(self, window_size=20, z_threshold=3.0):
+    def __init__(self, window_size=20, z_threshold=1.5):
         self.window_size = window_size 
         self.z_threshold = z_threshold  
         self.windows = {}  # Rolling queues for RPM history per trip_id
@@ -15,15 +15,15 @@ class RuleEngine:
         alerts = []
         
         # Rule 1: Hard Speeding Limit
-        if speed > 120.0:
+        if speed > 60.0:
             alerts.append({
                 "type": "OVERSPEEDING",
                 "severity": "HIGH",
-                "reason": f"Speed {speed:.1f} km/h exceeds maximum limit of 120 km/h."
+                "reason": f"Speed {speed:.1f} km/h exceeds maximum limit of 60 km/h."
             })
             
         # Rule 2: Idle Revving (High RPM while barely moving)
-        if speed < 10.0 and rpm > 3000:
+        if speed < 20.0 and rpm > 2000:
             alerts.append({
                 "type": "IDLE_REVVING",
                 "severity": "MEDIUM",

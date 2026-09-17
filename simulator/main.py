@@ -34,12 +34,19 @@ def generate_telemetry():
                 # Use the dataset's Trip ID if it exists, otherwise fallback to the generated one
                 current_trip = row.get('Trip', row.get('Trip_ID', row.get('Vehicle_ID', fallback_trip_id)))
                 
+                speed_str = row['Vehicle Speed[km/h]']
+                rpm_str = row['Engine RPM[RPM]']
+                
+                # Handle empty strings gracefully
+                speed_val = float(speed_str) if speed_str.strip() else 0.0
+                rpm_val = int(float(rpm_str)) if rpm_str.strip() else 0
+                
                 # Map Kaggle columns to Protobuf schema
                 point = telemetry_pb2.TelemetryPoint( 
                     trip_id=str(current_trip), 
                     timestamp=int(time.time() * 1000),
-                    speed=float(row['Vehicle Speed[km/h]']), 
-                    rpm=int(float(row['Engine RPM[RPM]'])),
+                    speed=speed_val, 
+                    rpm=rpm_val,
                     ambient_temp=25.0,
                     gradient=0.0,
                     gps_lat=float(row['Latitude[deg]']), 

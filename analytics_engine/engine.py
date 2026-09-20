@@ -7,55 +7,69 @@ class RuleEngine:
         self.window_size = window_size 
         self.z_threshold = z_threshold  
         
-    def evaluate(self, trip_id, rpm, speed):
+    def evaluate_batch(self, batch_data):
         """
-        Evaluates telemetry against multiple business rules.
-        Returns a list of alerts (dicts) triggered by this data point.
+        Evaluates a batch of telemetry points against multiple business rules.
+        batch_data is a list of dicts: [{"trip_id": x, "rpm": y, "speed": z, ...}, ...]
+        Returns a flat list of all alerts generated from this batch.
         """
         alerts = []
         
-        # Rule 1: Hard Speeding Limit
-        if speed > 60.0:
-            alerts.append({
-                "type": "OVERSPEEDING",
-                "severity": "HIGH",
-                "reason": f"Speed {speed:.1f} km/h exceeds maximum limit of 60 km/h."
-            })
+        # 1. First pass: Evaluate static rules (no database lookup required)
+        for data in batch_data:
+            speed = data["speed"]
+            rpm = data["rpm"]
+            trip_id = data["trip_id"]
             
-        # Rule 2: Idle Revving (High RPM while barely moving)
-        if speed < 20.0 and rpm > 2000:
-            alerts.append({
-                "type": "IDLE_REVVING",
-                "severity": "MEDIUM",
-                "reason": f"High engine revs ({rpm} RPM) while vehicle is stationary or moving slowly."
-            })
+            if speed > 60.0:
+                alerts.append({
+                    "trip_id": trip_id,
+                    "timestamp": data["timestamp"],
+                    "type": "OVERSPEEDING",
+                    "severity": "HIGH",
+                    "reason": f"Speed {speed:.1f} km/h exceeds maximum limit of 60 km/h."
+                })
+                
+            if speed < 20.0 and rpm > 2000:
+                alerts.append({
+                    "trip_id": trip_id,
+                    "timestamp": data["timestamp"],
+                    "type": "IDLE_REVVING",
+                    "severity": "MEDIUM",
+                    "reason": f"High engine revs ({rpm} RPM) while vehicle is stationary or moving slowly."
+                })
 
-        # Rule 3: Sudden Acceleration / Aggressive Driving (Z-Score)
-        window_key = f"window:{trip_id}"
-        
-        # Add to redis list and keep only the last window_size elements
-        # rpush (Right Push) 
-        self.redis.rpush(window_key, rpm)
-        
-        # ltrim (List Trim) truncate the list so it only keeps the most recent `self.window_size` elements.
-        # By passing negative indices (-self.window_size to -1), we are telling Redis to keep exactly the last N items,
-        self.redis.ltrim(window_key, -self.window_size, -1)
-        
-        # Fetch the window to evaluate
-        window_str = self.redis.lrange(window_key, 0, -1)
-        
-        if len(window_str) >= self.window_size:
-            window = [float(x) for x in window_str]
-            mean = np.mean(window)
-            std = np.std(window)
+        # 2. Second pass: Build one massive Redis Pipeline for the entire batch
+        pipeline = self.redis.pipeline()
+        for data in batch_data:
+            window_key = f"window:{data['trip_id']}"
+            pipeline.rpush(window_key, data["rpm"])
+            pipeline.ltrim(window_key, -self.window_size, -1)
+            pipeline.lrange(window_key, 0, -1)
             
-            if std > 0:
-                z_score = (rpm - mean) / std
-                if abs(z_score) > self.z_threshold:
-                    alerts.append({
-                        "type": "AGGRESSIVE_ACCELERATION",
-                        "severity": "HIGH",
-                        "reason": f"Sudden RPM spike detected (Z-Score: {z_score:.2f})."
-                    })
-                    
+        # Execute all 600+ commands in a single network round-trip!
+        results = pipeline.execute()
+        
+        # 3. Third pass: Extract the sliding windows and calculate Z-Scores
+        # Since we added 3 commands per point, the results list is exactly 3 * len(batch_data)
+        for i, data in enumerate(batch_data):
+            # The LRANGE result is at index i*3 + 2
+            window_str = results[i * 3 + 2]
+            
+            if len(window_str) >= self.window_size:
+                window = [float(x) for x in window_str]
+                mean = np.mean(window)
+                std = np.std(window)
+                
+                if std > 0:
+                    z_score = (data["rpm"] - mean) / std
+                    if abs(z_score) > self.z_threshold:
+                        alerts.append({
+                            "trip_id": data["trip_id"],
+                            "timestamp": data["timestamp"],
+                            "type": "AGGRESSIVE_ACCELERATION",
+                            "severity": "HIGH",
+                            "reason": f"Sudden RPM spike detected (Z-Score: {z_score:.2f})."
+                        })
+                        
         return alerts

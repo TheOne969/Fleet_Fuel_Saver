@@ -32,11 +32,12 @@ async def generate_telemetry(trip_id, end_time):
     }
 
     while time.time() < end_time:
-        if random.random() < 0.05: # 5% chance to change target speed
-            state["target"] = random.choice([0.0, 30.0, 50.0, 70.0])
+        if random.random() < 0.01: # 1% chance to change target speed (they hold speeds longer)
+            # Higher targets to force overspeeding alerts!
+            state["target"] = random.choice([50.0, 80.0, 100.0, 130.0])
             
         # Smoothly accelerate/decelerate towards target speed
-        state["speed"] = max(0.0, state["speed"] + (state["target"] - state["speed"]) * 0.1 + random.uniform(-1.0, 1.0))
+        state["speed"] = max(0.0, state["speed"] + (state["target"] - state["speed"]) * 0.2 + random.uniform(-2.0, 2.0))
         
         # Base RPM scales with speed
         state["rpm"] = max(800.0, 1000.0 + (state["speed"] * 20.0) + random.uniform(-200.0, 200.0))

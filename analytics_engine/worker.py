@@ -52,6 +52,7 @@ def main():
             telemetry_batch = []
             alerts_batch = []
             msg_ids_to_ack = []
+            engine_batch = []
             
             for stream, messages in events:  
                 for msg_id, data in messages:
@@ -69,23 +70,26 @@ def main():
                         float(data["gps_lat"]), float(data["gps_lng"])
                     ))
                     
-                    alerts = engine.evaluate(trip_id, rpm, speed)
+                    # Add to engine batch for bulk evaluation
+                    engine_batch.append({
+                        "trip_id": trip_id,
+                        "rpm": rpm,
+                        "speed": speed,
+                        "timestamp": data["timestamp"]
+                    })
                     
-                    for alert_data in alerts:
-                        alert = { 
-                            "trip_id": trip_id,  
-                            "timestamp": data["timestamp"],
-                            **alert_data
-                        }  
-                        
-                        # Instantly broadcast the alert to all connected Frontend Websockets via Pub/Sub
-                        r.publish("alerts:live", json.dumps(alert))
-                        logging.warning(f"Alert generated for {trip_id}: {alert}")
+            # Evaluate all 200 points in one massive Redis pipeline!
+            alerts = engine.evaluate_batch(engine_batch)
+            
+            for alert in alerts:
+                # Instantly broadcast the alert to all connected Frontend Websockets via Pub/Sub
+                r.publish("alerts:live", json.dumps(alert))
+                logging.warning(f"Alert generated for {alert['trip_id']}: {alert}")
 
-                        alerts_batch.append((
-                            int(data["timestamp"]), trip_id, alert_data["type"], 
-                            alert_data["severity"], alert_data["reason"]
-                        ))
+                alerts_batch.append((
+                    int(alert["timestamp"]), alert["trip_id"], alert["type"], 
+                    alert["severity"], alert["reason"]
+                ))
 
             # Execute batch inserts to dramatically reduce Postgres network round-trips
             if telemetry_batch:

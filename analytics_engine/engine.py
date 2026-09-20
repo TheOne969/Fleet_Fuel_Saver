@@ -2,10 +2,10 @@ import numpy as np
 from collections import deque  # Imports double-ended queue data structure
 
 class RuleEngine:
-    def __init__(self, window_size=20, z_threshold=1.5):
+    def __init__(self, redis_client, window_size=20, z_threshold=1.5):
+        self.redis = redis_client
         self.window_size = window_size 
         self.z_threshold = z_threshold  
-        self.windows = {}  # Rolling queues for RPM history per trip_id
         
     def evaluate(self, trip_id, rpm, speed):
         """
@@ -31,13 +31,21 @@ class RuleEngine:
             })
 
         # Rule 3: Sudden Acceleration / Aggressive Driving (Z-Score)
-        if trip_id not in self.windows:  
-            self.windows[trip_id] = deque(maxlen=self.window_size)
-            
-        window = self.windows[trip_id]
-        window.append(rpm)
+        window_key = f"window:{trip_id}"
         
-        if len(window) >= self.window_size:
+        # Add to redis list and keep only the last window_size elements
+        # rpush (Right Push) 
+        self.redis.rpush(window_key, rpm)
+        
+        # ltrim (List Trim) truncate the list so it only keeps the most recent `self.window_size` elements.
+        # By passing negative indices (-self.window_size to -1), we are telling Redis to keep exactly the last N items,
+        self.redis.ltrim(window_key, -self.window_size, -1)
+        
+        # Fetch the window to evaluate
+        window_str = self.redis.lrange(window_key, 0, -1)
+        
+        if len(window_str) >= self.window_size:
+            window = [float(x) for x in window_str]
             mean = np.mean(window)
             std = np.std(window)
             

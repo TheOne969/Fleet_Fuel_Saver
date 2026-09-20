@@ -37,6 +37,8 @@ services:
     restart: always
 
   analytics:
+    deploy:
+      replicas: 3
     build:
       context: .
       dockerfile: analytics_engine/Dockerfile

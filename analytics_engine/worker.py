@@ -1,36 +1,75 @@
 import json
 import logging
-from datetime import datetime
+import uuid
+import os
 from shared_redis import get_redis_client
 from core.database import get_db_connection, init_db
 from engine import RuleEngine
+from redis.exceptions import ResponseError
 
 def main(): 
     logging.basicConfig(level=logging.INFO)  
     init_db()  
     r = get_redis_client()  
     db = get_db_connection() 
-    db.autocommit = True  # Tells Postgres to automatically commit every executed statement (no manual commit() needed)
+    
+    # Enable autocommit to avoid needing manual db.commit() after every batch insert.
+    db.autocommit = True
     cursor = db.cursor()
     
-    engine = RuleEngine() 
-    last_id = "$"  # '$' tells Redis to only read NEW messages that arrive after we connect, skipping the historical backlog
+    # Pass the redis client so the engine can use it for stateless sliding windows
+    engine = RuleEngine(r)
     
-    logging.info("Analytics Worker started")  
-    while True:  # Starts the infinite background processing loop
-        try: 
-            events = r.xread({"telemetry:stream": last_id}, count=100, block=1000)  # Blocks for up to 1 second waiting to read up to 100 new messages from the Redis Stream since last_id
-            if not events:  # Checks if the read timed out without finding new data
+    # Configure Consumer Group
+    stream_name = "telemetry:stream"
+    group_name = "analytics_group"
+    
+    # Generate a unique worker ID using the container's hostname or a random UUID.
+    # This allows Redis to track which specific worker grabbed which message.
+    worker_id = f"worker-{os.getenv('HOSTNAME', uuid.uuid4().hex[:6])}"
+    
+    try:
+        # Create a consumer group. id='0' tells it to start at the absolute beginning of the stream.
+        # mkstream=True automatically creates the stream if it doesn't exist yet.
+        r.xgroup_create(stream_name, group_name, id='0', mkstream=True)
+        logging.info(f"Created consumer group {group_name}")
+    except ResponseError as e:
+        # Ignore the error if the group already exists from a previous run.
+        if "BUSYGROUP Consumer Group name already exists" not in str(e):
+            raise
+    
+    logging.info(f"Analytics Worker {worker_id} started in consumer group {group_name}")
+    
+    while True:
+        try:
+            # Read from the consumer group using ">" to get new messages never delivered to any consumer.
+            # count=200 fetches up to 200 points at a time for efficient batch processing.
+            # block=1000 causes the worker to wait peacefully for 1 second if the stream is empty, saving CPU.
+            events = r.xreadgroup(group_name, worker_id, {stream_name: ">"}, count=200, block=1000)
+            if not events:
                 continue  
                 
-            for stream_name, messages in events:  
-                for msg_id, data in messages: 
-                    last_id = msg_id  # Update the read pointer every iteration instad of just once after the for loop for CRASH RECOVERY
+            telemetry_batch = []
+            alerts_batch = []
+            msg_ids_to_ack = []
+            
+            for stream, messages in events:  
+                for msg_id, data in messages:
+                    # Keep track of the message IDs so we can acknowledge them as processed later
+                    msg_ids_to_ack.append(msg_id)
+                    
                     trip_id = data["trip_id"]  
                     rpm = float(data["rpm"])  
                     speed = float(data["speed"])  
                     
-                    alerts = engine.evaluate(trip_id, rpm, speed)  # Passes the data to the rule engine
+                    # Prepare telemetry as a tuple to be used in bulk Postgres inserts
+                    telemetry_batch.append((
+                        int(data["timestamp"]), trip_id, speed, rpm, 
+                        float(data["ambient_temp"]), float(data["gradient"]), 
+                        float(data["gps_lat"]), float(data["gps_lng"])
+                    ))
+                    
+                    alerts = engine.evaluate(trip_id, rpm, speed)
                     
                     for alert_data in alerts:
                         alert = { 
@@ -38,27 +77,37 @@ def main():
                             "timestamp": data["timestamp"],
                             **alert_data
                         }  
-                        r.publish("alerts:live", json.dumps(alert))  # Broadcasts the serialized JSON alert to a Redis Pub/Sub channel for frontend consumption
+                        
+                        # Instantly broadcast the alert to all connected Frontend Websockets via Pub/Sub
+                        r.publish("alerts:live", json.dumps(alert))
                         logging.warning(f"Alert generated for {trip_id}: {alert}")
 
-                        cursor.execute("""
-                            INSERT INTO alerts (time, trip_id, type, severity, reason)
-                            VALUES (to_timestamp(%s / 1000.0), %s, %s, %s, %s)
-                        """, (
+                        alerts_batch.append((
                             int(data["timestamp"]), trip_id, alert_data["type"], 
                             alert_data["severity"], alert_data["reason"]
                         ))
 
-                    cursor.execute("""
-                        INSERT INTO telemetry_data (time, trip_id, speed, rpm, ambient_temp, gradient, gps_lat, gps_lng)
-                        VALUES (to_timestamp(%s / 1000.0), %s, %s, %s, %s, %s, %s, %s)
-                    """, (
-                        int(data["timestamp"]), trip_id, speed, rpm, 
-                        float(data["ambient_temp"]), float(data["gradient"]), 
-                        float(data["gps_lat"]), float(data["gps_lng"])
-                    ))  
+            # Execute batch inserts to dramatically reduce Postgres network round-trips
+            if telemetry_batch:
+                from psycopg2.extras import execute_batch
+                execute_batch(cursor, """
+                    INSERT INTO telemetry_data (time, trip_id, speed, rpm, ambient_temp, gradient, gps_lat, gps_lng)
+                    VALUES (to_timestamp(%s / 1000.0), %s, %s, %s, %s, %s, %s, %s)
+                """, telemetry_batch)
+                
+            if alerts_batch:
+                execute_batch(cursor, """
+                    INSERT INTO alerts (time, trip_id, type, severity, reason)
+                    VALUES (to_timestamp(%s / 1000.0), %s, %s, %s, %s)
+                """, alerts_batch)
+            
+            # XACK (Acknowledge) tells Redis that this worker successfully saved these messages to Postgres,
+            # so Redis can safely delete them from the group's "Pending" list.
+            if msg_ids_to_ack:
+                r.xack(stream_name, group_name, *msg_ids_to_ack)
+                
         except Exception as e:  
             logging.error(f"Worker error: {e}")  
 
 if __name__ == "__main__":  
-    main()  
+    main()

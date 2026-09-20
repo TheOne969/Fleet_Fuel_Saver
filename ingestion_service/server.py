@@ -1,21 +1,21 @@
 import grpc
-from concurrent import futures
+import asyncio
 import logging
 
 from shared_proto import telemetry_pb2
 from shared_proto import telemetry_pb2_grpc
-from shared_redis import get_redis_client
+from shared_redis.client import get_async_redis_client
 
-class TelemetryService(telemetry_pb2_grpc.TelemetryServiceServicer): # Defines the gRPC service class inheriting from the generated proto stub
-    def __init__(self): # Initializes the service instance
-        self.redis = get_redis_client() # Creates a Redis client connection
-        self.stream_name = "telemetry:stream" # Sets the Redis Stream key name
+class TelemetryService(telemetry_pb2_grpc.TelemetryServiceServicer):
+    def __init__(self):
+        self.redis = get_async_redis_client()
+        self.stream_name = "telemetry:stream"
 
-    def StreamTelemetry(self, request_iterator, context): # Handles incoming gRPC streams of telemetry points
+    async def StreamTelemetry(self, request_iterator, context):
         points_received = 0 
         try: 
-            for point in request_iterator: # Iterates over each incoming gRPC point in the stream
-                data = { # Starts constructing a dictionary for the point
+            async for point in request_iterator:
+                data = { 
                     "trip_id": point.trip_id, 
                     "timestamp": point.timestamp, 
                     "speed": point.speed, 
@@ -25,26 +25,26 @@ class TelemetryService(telemetry_pb2_grpc.TelemetryServiceServicer): # Defines t
                     "gps_lat": point.gps_lat,
                     "gps_lng": point.gps_lng, 
                 } 
-                # XADD to Redis Stream
-                self.redis.xadd(self.stream_name, data, maxlen=100000) # Appends with maxlen cap
+                # Async XADD to Redis Stream
+                await self.redis.xadd(self.stream_name, data, maxlen=100000)
                 points_received += 1 
         except Exception as e: 
             logging.error(f"Error processing stream: {e}") 
         
-        return telemetry_pb2.TelemetryResponse( # Returns the final gRPC response to the client
+        return telemetry_pb2.TelemetryResponse(
             success=True, 
-            message="Stream processed", # Provides a success message
-            points_received=points_received # Reports how many points were processed
+            message="Stream processed",
+            points_received=points_received
         ) 
 
-def serve(): # Defines the main server startup function, which will act as the middleman between redis streams and vehicle
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10)) # Creates a gRPC server with a thread pool of 10 workers, which can handle 10 vehicles simulatenously
-    telemetry_pb2_grpc.add_TelemetryServiceServicer_to_server(TelemetryService(), server) # Registers our TelemetryService with the gRPC server
-    server.add_insecure_port('[::]:50051') # Binds the server to all interfaces on port 50051 without TLS encryption.
-    server.start() # Starts listening for incoming gRPC connections
-    logging.info("Ingestion server started on port 50051")
-    server.wait_for_termination() # Blocks the main thread to keep the server alive
+async def serve():
+    server = grpc.aio.server()
+    telemetry_pb2_grpc.add_TelemetryServiceServicer_to_server(TelemetryService(), server)
+    server.add_insecure_port('[::]:50051')
+    await server.start()
+    logging.info("Async Ingestion server started on port 50051")
+    await server.wait_for_termination()
 
 if __name__ == '__main__': 
     logging.basicConfig(level=logging.INFO) 
-    serve() 
+    asyncio.run(serve())

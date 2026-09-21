@@ -40,6 +40,7 @@ class RuleEngine:
                 })
 
         # 2. Second pass: Build one massive Redis Pipeline for the entire batch
+        # transaction=True (default) wraps all commands in MULTI/EXEC for atomicity
         pipeline = self.redis.pipeline()
         for data in batch_data:
             window_key = f"window:{data['trip_id']}"

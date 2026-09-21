@@ -81,6 +81,8 @@ def main():
             # Evaluate all 200 points in one massive Redis pipeline!
             alerts = engine.evaluate_batch(engine_batch)
             
+            logging.info(f"[Analytics {worker_id}] Successfully processed batch of {len(engine_batch)} points. Found {len(alerts)} alerts.")
+            
             for alert in alerts:
                 # Instantly broadcast the alert to all connected Frontend Websockets via Pub/Sub
                 r.publish("alerts:live", json.dumps(alert))

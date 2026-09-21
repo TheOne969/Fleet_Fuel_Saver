@@ -22,23 +22,18 @@ def generate_telemetry():
         yield from random_generation()
         return
 
-    fallback_trip_id = f"trip-csv-{uuid.uuid4().hex[:8]}"
-    print(f"✅ Found Kaggle Dataset! Replaying {csv_path}...")
     num_vehicles = int(os.environ.get("NUM_VEHICLES", "10"))
     print(f"✅ Found Kaggle Dataset! Simulating {num_vehicles} concurrent vehicles from {csv_path}...")
     
     try:
         with open(csv_path, 'r') as f:
             reader = csv.DictReader(f)
-            for row in reader:
             batch = []
             
             for i, row in enumerate(reader):
                 if not is_running:
                     break
                     
-                # Use the dataset's Trip ID if it exists, otherwise fallback to the generated one
-                current_trip = row.get('Trip', row.get('Trip_ID', row.get('Vehicle_ID', fallback_trip_id)))
                 # Force a fixed pool of vehicles instead of random dataset trips
                 current_trip = f"csv-vehicle-{(i % num_vehicles) + 1:03d}"
                 
@@ -49,9 +44,7 @@ def generate_telemetry():
                 speed_val = float(speed_str) if speed_str.strip() else 0.0
                 rpm_val = int(float(rpm_str)) if rpm_str.strip() else 0
                 
-                # Map Kaggle columns to Protobuf schema
                 point = telemetry_pb2.TelemetryPoint( 
-                    trip_id=str(current_trip), 
                     trip_id=current_trip, 
                     timestamp=int(time.time() * 1000),
                     speed=speed_val, 
@@ -61,9 +54,6 @@ def generate_telemetry():
                     gps_lat=float(row['Latitude[deg]']), 
                     gps_lng=float(row['Longitude[deg]'])
                 )  
-                print(f"[CSV] {current_trip} | Speed: {point.speed:5.1f} | RPM: {point.rpm:4.0f}")
-                yield point
-                time.sleep(config.TICK_RATE_MS / 1000.0)
                 batch.append(point)
                 
                 # When we have collected one point for every vehicle, stream them and sleep

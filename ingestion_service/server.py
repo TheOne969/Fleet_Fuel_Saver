@@ -25,9 +25,18 @@ class TelemetryService(telemetry_pb2_grpc.TelemetryServiceServicer):
                     "gps_lat": point.gps_lat,
                     "gps_lng": point.gps_lng, 
                 } 
+                # Redis requires string/int/bytes values. Convert floats to strings.
+                for key, val in data.items():
+                    if isinstance(val, float):
+                        data[key] = str(val)
+                
                 # Async XADD to Redis Stream
                 await self.redis.xadd(self.stream_name, data, maxlen=100000)
-                points_received += 1 
+                points_received += 1
+                
+                # Demo Heartbeat: Log every 50 points received per stream
+                if points_received % 50 == 0:
+                    logging.info(f"[Ingestion] Stream active: Received {points_received} points so far from this vehicle connection.") 
         except Exception as e: 
             logging.error(f"Error processing stream: {e}") 
         

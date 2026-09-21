@@ -11,11 +11,15 @@ interface Alert {
 interface FleetStore {
   alerts: Alert[];
   addAlert: (alert: Alert) => void;
+  addAlerts: (newAlerts: Alert[]) => void;
 }
 
 export const useFleetStore = create<FleetStore>((set) => ({
   alerts: [],
   addAlert: (alert) => set((state) => ({ 
       alerts: [alert, ...state.alerts].slice(0, 100) 
+  })),
+  addAlerts: (newAlerts) => set((state) => ({
+      alerts: [...newAlerts.reverse(), ...state.alerts].slice(0, 100)
   })),
 }));

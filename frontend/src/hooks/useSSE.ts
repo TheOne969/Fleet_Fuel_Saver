@@ -1,9 +1,7 @@
 import { useEffect } from 'react';
-import { useEffect, useRef } from 'react';
 import { useFleetStore } from '../store/useFleetStore';
 
 export function useSSE(url: string) {
-  const addAlert = useFleetStore((state) => state.addAlert);
   const addAlerts = useFleetStore((state) => state.addAlerts);
 
   useEffect(() => {
@@ -13,7 +11,6 @@ export function useSSE(url: string) {
     eventSource.addEventListener('alert', (event) => {
       try {
         const data = JSON.parse(event.data);
-        addAlert(data);
         buffer.push(data);
       } catch (e) {
         console.error("Failed to parse alert", e);
@@ -32,7 +29,5 @@ export function useSSE(url: string) {
       eventSource.close();
       clearInterval(interval);
     };
-  }, [url, addAlert]);
   }, [url, addAlerts]);
 }
-

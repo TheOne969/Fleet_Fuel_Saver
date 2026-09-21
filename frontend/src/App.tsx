@@ -12,6 +12,10 @@ function App() {
   const alerts = useFleetStore((state) => state.alerts);
   const { starredTrips, toggleBookmark } = useBookmarkStore();
   const [tab, setTab] = useState<'live' | 'history' | 'bookmarks'>('live');
+  const [liveFilter, setLiveFilter] = useState('');
+
+  // Extract unique trip IDs currently in the live buffer for the datalist
+  const uniqueLiveTrips = Array.from(new Set(alerts.map(a => a.trip_id)));
 
   return (
     <div style={{ padding: '20px', fontFamily: 'sans-serif', maxWidth: '1200px', margin: '0 auto' }}>
@@ -23,31 +27,55 @@ function App() {
       </div>
 
       {tab === 'live' && (
-        <div style={{ display: 'grid', gap: '10px' }}>
-          {alerts.map((a, i) => (
-            <div key={i} style={{ 
-                padding: '10px', 
-                border: `1px solid ${a.severity === 'HIGH' ? 'red' : 'orange'}`, 
-                borderRadius: '4px', 
-                background: a.severity === 'HIGH' ? '#fee' : '#fff3e0',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
-              }}>
-              <div>
-                <strong>{a.trip_id}</strong> - <span style={{ color: a.severity === 'HIGH' ? 'red' : 'orange', fontWeight: 'bold' }}>{a.type}</span>
-                <p style={{ margin: '5px 0 0 0', fontSize: '14px', color: '#555' }}>{a.reason}</p>
-              </div>
-              <button 
-                onClick={() => toggleBookmark(a.trip_id)}
-                style={{ fontSize: '24px', background: 'none', border: 'none', cursor: 'pointer' }}
-                title="Bookmark Trip"
-              >
-                {starredTrips.includes(a.trip_id) ? '⭐' : '☆'}
-              </button>
-            </div>
-          ))}
-          {alerts.length === 0 && <p>No alerts currently.</p>}
+        <div>
+          <div style={{ marginBottom: '15px' }}>
+            <input 
+              list="live-trips"
+              type="text" 
+              placeholder="Filter by Trip ID (e.g. csv-vehicle-001)..." 
+              value={liveFilter} 
+              onChange={(e) => setLiveFilter(e.target.value)} 
+              style={{ padding: '8px', width: '300px', borderRadius: '4px', border: '1px solid #ccc' }}
+            />
+            <datalist id="live-trips">
+              {uniqueLiveTrips.map(id => <option key={id} value={id} />)}
+            </datalist>
+            {liveFilter && (
+              <button onClick={() => setLiveFilter('')} style={{ padding: '8px 15px', marginLeft: '10px', cursor: 'pointer' }}>Clear</button>
+            )}
+          </div>
+
+          <div style={{ display: 'grid', gap: '10px' }}>
+            {alerts
+              .filter(a => a.trip_id.toLowerCase().includes(liveFilter.toLowerCase()))
+              .map((a, i) => (
+                <div key={i} style={{ 
+                    padding: '10px', 
+                    border: `1px solid ${a.severity === 'HIGH' ? 'red' : 'orange'}`, 
+                    borderRadius: '4px', 
+                    background: a.severity === 'HIGH' ? '#fee' : '#fff3e0',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                  <div>
+                    <strong>{a.trip_id}</strong> - <span style={{ color: a.severity === 'HIGH' ? 'red' : 'orange', fontWeight: 'bold' }}>{a.type}</span>
+                    <p style={{ margin: '5px 0 0 0', fontSize: '14px', color: '#555' }}>{a.reason}</p>
+                  </div>
+                  <button 
+                    onClick={() => toggleBookmark(a.trip_id)}
+                    style={{ fontSize: '24px', background: 'none', border: 'none', cursor: 'pointer' }}
+                    title="Bookmark Trip"
+                  >
+                    {starredTrips.includes(a.trip_id) ? '⭐' : '☆'}
+                  </button>
+                </div>
+              ))}
+            {alerts.length === 0 && <p>No alerts currently.</p>}
+            {alerts.length > 0 && alerts.filter(a => a.trip_id.toLowerCase().includes(liveFilter.toLowerCase())).length === 0 && (
+              <p>No alerts match that Trip ID.</p>
+            )}
+          </div>
         </div>
       )}
 

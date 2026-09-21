@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react';
 import { useFleetStore } from './store/useFleetStore';
 import { useBookmarkStore } from './store/useBookmarkStore';
 import { useSSE } from './hooks/useSSE';
-import { Bar } from 'react-chartjs-2';
-import { Chart, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
+import { Bar, Line } from 'react-chartjs-2';
+import { Chart, CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Tooltip, Legend } from 'chart.js';
 
-Chart.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
+Chart.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Tooltip, Legend);
 
 function App() {
   useSSE('http://localhost:8000/alerts/stream');
@@ -104,27 +104,40 @@ function App() {
 
 function HistoryTab({ starredTrips, toggleBookmark }: { starredTrips: string[], toggleBookmark: (id: string) => void }) {
   const [stats, setStats] = useState<any[]>([]);
+  const [timeseries, setTimeseries] = useState<any[]>([]);
   const [historyAlerts, setHistoryAlerts] = useState<any[]>([]);
   const [filterTrip, setFilterTrip] = useState('');
+  const [filterHours, setFilterHours] = useState(1);
 
-  useEffect(() => {
-    fetch('http://localhost:8000/history/stats')
+  const fetchAllData = (trip = filterTrip, hours = filterHours) => {
+    const queryArgs = new URLSearchParams();
+    if (trip) queryArgs.append('trip_id', trip);
+    queryArgs.append('hours', hours.toString());
+    const query = `?${queryArgs.toString()}`;
+    
+    fetch(`http://localhost:8000/history/stats${query}`)
       .then(res => res.json())
       .then(d => setStats(d.data || []))
       .catch(e => console.error("Stats API failed", e));
-    fetchAlerts();
-  }, []);
-
-  const fetchAlerts = (trip = '') => {
-    fetch(`http://localhost:8000/history/alerts?limit=50${trip ? `&trip_id=${trip}` : ''}`)
+      
+    fetch(`http://localhost:8000/history/timeseries${query}`)
+      .then(res => res.json())
+      .then(d => setTimeseries(d.data || []))
+      .catch(e => console.error("Timeseries API failed", e));
+      
+    fetch(`http://localhost:8000/history/alerts${query}&limit=50`)
       .then(res => res.json())
       .then(d => setHistoryAlerts(d.data || []))
       .catch(e => console.error("Alerts API failed", e));
   };
 
-  const handleSearch = () => fetchAlerts(filterTrip);
+  useEffect(() => {
+    fetchAllData();
+  }, []);
 
-  const chartData = {
+  const handleSearch = () => fetchAllData(filterTrip, filterHours);
+
+  const barChartData = {
     labels: stats.map(s => s.name),
     datasets: [{
       label: 'Total Alerts',
@@ -132,12 +145,34 @@ function HistoryTab({ starredTrips, toggleBookmark }: { starredTrips: string[], 
       backgroundColor: '#f57c00'
     }]
   };
+  
+  const lineChartData = {
+    labels: timeseries.map(t => new Date(t.bucket).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})),
+    datasets: [{
+      label: 'Alerts per Minute',
+      data: timeseries.map(t => t.count),
+      borderColor: '#1976d2',
+      backgroundColor: 'rgba(25, 118, 210, 0.2)',
+      fill: true,
+      tension: 0.3
+    }]
+  };
 
   return (
     <div>
-      <div style={{ height: '300px', marginBottom: '40px' }}>
-        <h3>Alerts by Type (All Time)</h3>
-        {stats.length > 0 ? <Bar data={chartData} options={{ maintainAspectRatio: false }} /> : <p>Loading chart...</p>}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '40px' }}>
+        <div>
+          <h3>Alerts by Type {filterTrip ? `(${filterTrip})` : ''} ({filterHours === 1 ? 'Last Hour' : filterHours === 24 ? 'Last 24 Hours' : 'Last 7 Days'})</h3>
+          <div style={{ height: '300px', position: 'relative' }}>
+            {stats.length > 0 ? <Bar data={barChartData} options={{ maintainAspectRatio: false }} /> : <p>Loading chart...</p>}
+          </div>
+        </div>
+        <div>
+          <h3>Alert Velocity {filterTrip ? `(${filterTrip})` : ''} ({filterHours === 1 ? 'Last Hour' : filterHours === 24 ? 'Last 24 Hours' : 'Last 7 Days'})</h3>
+          <div style={{ height: '300px', position: 'relative' }}>
+            {timeseries.length > 0 ? <Line data={lineChartData} options={{ maintainAspectRatio: false }} /> : <p>Loading time-series...</p>}
+          </div>
+        </div>
       </div>
 
       <div>
@@ -149,8 +184,21 @@ function HistoryTab({ starredTrips, toggleBookmark }: { starredTrips: string[], 
             placeholder="Filter by Trip ID..." 
             style={{ padding: '8px', marginRight: '10px' }}
           />
+          <select 
+            value={filterHours} 
+            onChange={(e) => {
+              const newHours = Number(e.target.value);
+              setFilterHours(newHours);
+              fetchAllData(filterTrip, newHours);
+            }} 
+            style={{ padding: '8px', marginRight: '10px' }}
+          >
+            <option value={1}>Last 1 Hour</option>
+            <option value={24}>Last 24 Hours</option>
+            <option value={168}>Last 7 Days</option>
+          </select>
           <button onClick={handleSearch} style={{ padding: '8px' }}>Search</button>
-          <button onClick={() => { setFilterTrip(''); fetchAlerts(''); }} style={{ padding: '8px', marginLeft: '10px' }}>Clear</button>
+          <button onClick={() => { setFilterTrip(''); setFilterHours(1); fetchAllData('', 1); }} style={{ padding: '8px', marginLeft: '10px' }}>Clear</button>
         </div>
         
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
